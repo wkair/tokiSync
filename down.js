@@ -1,5 +1,4 @@
 import { connect } from "puppeteer-real-browser";
-import axios from 'axios';
 import fs from 'node:fs';
 
 let info = {
@@ -12,9 +11,9 @@ let info = {
     contentTitle: '화산귀환'
 }
 
-function sleep(num) {
+function sleep(ms) {
     return new Promise(function (resolve) {
-        setTimeout(() => { resolve(); }, num);
+        setTimeout(() => { resolve(); }, ms);
     })
 }
 function consoleRed(val) {
@@ -86,33 +85,18 @@ function saveBook(path, fileName, content) {
         fs.mkdirSync(path, { recursive: true });
     fs.writeFileSync(`${path}/${fileName}`, content);
 }
-function saveImage(path, fileName, src) {
-    return new Promise((resolve) => {
-        axios.get(src, {
-            responseType: 'stream',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0',
-            }
-        }).then(function (response) {
-            if (!fs.existsSync(path))
-                fs.mkdirSync(path, { recursive: true });
-            let writer = fs.createWriteStream(`${path}/${fileName}`);
-            response.data.pipe(writer);
-            response.data.on('error', (err) => {
-                consoleGrey(`${path}/${fileName} download on error`);
-                resolve();
-            });
-            writer.on('finish', () => {
-                // console.log(`${path}/${fileName} download success`);
-                resolve();
-            });
-        }).catch(function (error) {
-            consoleRed(`download error: ${path}/${fileName}`);
-            console.log(`재시도합니다`);
-            //console.log(error);
-            return saveImage(path, fileName, src);
-        })
-    })
+async function saveImage(page, path, fileName, src) {
+    // 이미지버퍼 저장
+    const imageBuffer = await page.evaluate(async (url) => {
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        return Array.from(new Uint8Array(buffer)); // serialize-able 형태로 변환
+    }, src);
+    // 경로가 없다면 만들기
+    if (!fs.existsSync(path))
+        fs.mkdirSync(path, { recursive: true });
+    // Buffer로 변환해서 파일 저장
+    fs.writeFileSync(`${path}/${fileName}`, Buffer.from(imageBuffer));
 }
 
 async function main() {
@@ -120,24 +104,19 @@ async function main() {
         headless: false,
         args: [],
         customConfig: {},
-        turnstile: false, //captcha를 자동으로 풀것인지
+        turnstile: true, //captcha를 자동으로 풀것인지
         connectOption: { defaultViewport: null },
         disableXvfb: true, //화면을 볼것인지
-        // proxy:{
-        //     host:'<proxy-host>',
-        //     port:'<proxy-port>',
-        //     username:'<proxy-username>',
-        //     password:'<proxy-password>'
-        // }
     })
     try {
         // await page.goto('https://booktoki350.com/');
         await Promise.all([page.waitForNavigation(), page.goto(info.url)]);
-        // cloudflare에 막혔다면 다시 기다린다.
+        // cloudflare에 막히기때문에 title이 바뀌기전까지 기다린다.
         while (!(await page.title()).includes(info.siteTitle)) {
-            await page.waitForNetworkIdle();
+            await sleep(100);
         }
         let link = [];
+        // 연재 목록들의 링크를 알아낸다. {num:회차, fileName:연재제목, src:링크}로 구성되어있다.
         while (true) {
             await page.locator('.list-body').setTimeout(40000).wait();
             sleep(1000);
@@ -163,6 +142,7 @@ async function main() {
             else
                 break;
         }
+        // 1화부터 받을것이기 때문에 리버스 해준다.
         link.reverse();
         // info.startIndex와 info.lastIndex필터하기.
         while (parseInt(link[0].num) < info.startIndex) {
@@ -174,7 +154,7 @@ async function main() {
         // 페이지 방문하기
         for (let i = 0; i < link.length; i++) {
             await Promise.all([page.goto(link[i].src), page.waitForNavigation()]);
-            await sleep(1000);
+            await sleep(2000);
             console.log(`${link[i].num} ${link[i].fileName} 진행중`);
             // 북토끼
             if (info.site === "booktoki") {
@@ -214,13 +194,14 @@ async function main() {
                 })
                 console.log(`이미지 ${imgLists.length}개 감지`);
                 let promiseList = [];
+                // 이미지들을 다운로드한다.
                 for (let j = 0; j < imgLists.length; j++) {
                     const path = `./${info.siteTitle}/${info.contentTitle}/${link[i].num} ${link[i].fileName}`;
                     const fileName = `${link[i].num} ${link[i].fileName} image${j.toString().padStart(4, '0')}${imgLists[j].extension}`;
-                    // axios로 이미지 다운. 있다면 다운하지 않는다.
+                    // 이미지 다운. 있다면 다운하지 않는다.
                     if (!fs.existsSync(`${path}/${fileName}`))
-                        promiseList.push(saveImage(path, fileName, `${imgLists[j].src.replace(/https:\/\/[^/]+/, info.protocolDomain)}`));
-                        // protocolDomain으로 바꿈으로서 CORS 해결
+                        promiseList.push(saveImage(page, path, fileName, `${imgLists[j].src.replace(/https:\/\/[^/]+/, info.protocolDomain)}`));
+                    // protocolDomain으로 바꿈으로서 CORS 해결
                 }
                 await Promise.all(promiseList);
             }
