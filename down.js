@@ -106,7 +106,7 @@ async function main() {
         customConfig: {},
         turnstile: true, //captcha를 자동으로 풀것인지
         connectOption: { defaultViewport: null },
-        disableXvfb: true, //화면을 볼것인지
+        disableXvfb: false, //화면을 볼것인지
     })
     try {
         // await page.goto('https://booktoki350.com/');
@@ -161,12 +161,7 @@ async function main() {
                 await page.locator('#novel_content').wait();
                 // 텍스트 가져오기
                 let fileContent = await page.evaluate(() => {
-                    let textLists = document.querySelector('#novel_content').querySelectorAll('div > div> p, div > div> div');
-                    let fileContent = '';
-                    for (let j = 0; j < textLists.length; j++) {
-                        fileContent += textLists[j].innerText;
-                        fileContent += '\n';
-                    }
+                    const fileContent = document.querySelector('#novel_content').innerText;
                     return fileContent;
                 });
                 // 텍스트 저장. 이미 있다면 저장하지 않음.
@@ -185,7 +180,9 @@ async function main() {
                         if (imgLists[j].checkVisibility() === false)
                             imgLists.splice(j, 1);
                         else {
-                            let src = imgLists[j].outerHTML.match(/https[^"]+/)[0];
+                            let src = imgLists[j].outerHTML
+                            // protocolDomain이 빠진 src이다.
+                            src = `${src.match(/\/data[^"]+/)[0]}`;
                             imgLists[j] = { src, extension: src.match(/\.[a-zA-Z]+$/)[0] }
                             j++;
                         }
@@ -200,7 +197,7 @@ async function main() {
                     const fileName = `${link[i].num} ${link[i].fileName} image${j.toString().padStart(4, '0')}${imgLists[j].extension}`;
                     // 이미지 다운. 있다면 다운하지 않는다.
                     if (!fs.existsSync(`${path}/${fileName}`))
-                        promiseList.push(saveImage(page, path, fileName, `${imgLists[j].src.replace(/https:\/\/[^/]+/, info.protocolDomain)}`));
+                        promiseList.push(saveImage(page, path, fileName, `${info.protocolDomain}${imgLists[j].src}`));
                     // protocolDomain으로 바꿈으로서 CORS 해결
                 }
                 await Promise.all(promiseList);
