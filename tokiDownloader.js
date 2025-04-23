@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         tokiDownloader
 // @namespace    https://github.com/crossSiteKikyo/tokiDownloader
-// @version      0.0.1
+// @version      0.0.2
 // @description  북토끼, 뉴토끼, 마나토끼 다운로더
 // @author       hehaho
 // @match        https://*.com/webtoon/*
@@ -154,8 +154,13 @@
                         let src = imgLists[j].outerHTML;
                         // src가 https://가 없을 때도 있어서 \/data[^"]+로 감지해야함.
                         src = `${protocolDomain}${src.match(/\/data[^"]+/)[0]}`;
-                        const extension = src.match(/\.[a-zA-Z]+$/)[0];
-                        promiseList.push(fetchAndAddToZip(src, num, folderName, j, extension, imgLists.length));
+                        try {
+                            // 가끔 확장자가 없는 이미지가 있는데, 해당 이미지는 다운받지 않음.
+                            const extension = src.match(/\.[a-zA-Z]+$/)[0];
+                            promiseList.push(fetchAndAddToZip(src, num, folderName, j, extension, imgLists.length));
+                        } catch(error) {
+                            console.log(error);
+                        }
                     }
                     await Promise.all(promiseList);
                     console.log(`${i + 1}/${list.length} ${folderName} 완료`);
