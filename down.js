@@ -175,19 +175,24 @@ async function main() {
                 let imgLists = await page.evaluate(() => {
                     // view-padding의 div의 img.
                     let imgLists = Array.from(document.querySelectorAll('.view-padding div img'));
+                    let returnList = [];
                     // 화면에 보이지 않는 이미지라면 리스트에서 제거
                     for (let j = 0; j < imgLists.length;) {
                         if (imgLists[j].checkVisibility() === false)
                             imgLists.splice(j, 1);
                         else {
                             let src = imgLists[j].outerHTML
-                            // protocolDomain이 빠진 src이다.
-                            src = `${src.match(/\/data[^"]+/)[0]}`;
-                            imgLists[j] = { src, extension: src.match(/\.[a-zA-Z]+$/)[0] }
+                            try {
+                                // protocolDomain이 빠진 src이다.
+                                src = `${src.match(/\/data[^"]+/)[0]}`;
+                                const extension = src.match(/\.[a-zA-Z]+$/)[0]
+                                returnList.push({ src, extension });
+                            } 
+                            catch (error) {}
                             j++;
                         }
                     }
-                    return imgLists;
+                    return returnList;
                 })
                 console.log(`이미지 ${imgLists.length}개 감지`);
                 let promiseList = [];

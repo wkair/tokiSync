@@ -152,9 +152,9 @@
                         // src를 직접 가져오면 loading.gif를 가져온다.
                         // protocolDomain으로 바꿈으로서 CORS 해결
                         let src = imgLists[j].outerHTML;
-                        // src가 https://가 없을 때도 있어서 \/data[^"]+로 감지해야함.
-                        src = `${protocolDomain}${src.match(/\/data[^"]+/)[0]}`;
                         try {
+                            // src가 https://가 없을 때도 있어서 \/data[^"]+로 감지해야함.
+                            src = `${protocolDomain}${src.match(/\/data[^"]+/)[0]}`;
                             // 가끔 확장자가 없는 이미지가 있는데, 해당 이미지는 다운받지 않음.
                             const extension = src.match(/\.[a-zA-Z]+$/)[0];
                             promiseList.push(fetchAndAddToZip(src, num, folderName, j, extension, imgLists.length));
