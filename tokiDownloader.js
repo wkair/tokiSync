@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         tokiDownloader
 // @namespace    https://github.com/crossSiteKikyo/tokiDownloader
-// @version      0.0.2
+// @version      0.0.3
 // @description  북토끼, 뉴토끼, 마나토끼 다운로더
 // @author       hehaho
 // @match        https://*.com/webtoon/*
 // @match        https://*.com/novel/*
 // @match        https://*.net/comic/*
-// @icon         https://i.namu.wiki/i/VLM5tYIVQKb8_ULcWJYsKvbV7swtlZE93vkQQiZei0LiwrbyDQHvSEup8Hnr2tTXAUtBjS0srw1OnSjU540TpAapRswupu3nE_JE_A9d3o1YXX5sqRL-qRyzkjBY6X3ss-gzOVryhlC4YmnhpFLhyQ.webp
+// @icon         https://github.com/user-attachments/assets/99f5bb36-4ef8-40cc-8ae5-e3bf1c7952ad
 // @grant        GM_registerMenuCommand
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip-utils/0.1.0/jszip-utils.js
