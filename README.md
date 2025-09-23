@@ -2,7 +2,7 @@
 - 프로그램 설치 불필요
 - 정보수집 없음
 ## 사용법
-1. Tempermonkey 확장 프로그램 설치
+1. Tampermonkey 확장 프로그램 설치
 2. [tokiDownloader](https://sleazyfork.org/ko/scripts/531932-tokidownloader) 접속해 스크립트 설치
 3. 뉴토끼, 마나토끼, 북토끼 회차 목록 페이지 접속
 4. 원하는 기능을 클릭해 다운로드
