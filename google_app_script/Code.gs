@@ -34,11 +34,20 @@ function doPost(e) {
 function initResumableUpload(data) {
   const folderId = getFolderId(data.folderName); 
   const url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable";
+
+    // 파일 확장자에 따라 MIME 타입 설정
+  let mimeType = "application/zip"; // 기본값
+  const fileName = data.fileName.toLowerCase();
+  if (fileName.endsWith('.txt')) {
+    mimeType = "text/plain";
+  } else if (fileName.endsWith('.cbz')) {
+    mimeType = "application/zip"; // CBZ는 ZIP 기반
+  }
   
   const metadata = {
     name: data.fileName,
     parents: [folderId],
-    mimeType: "application/zip" // CBZ도 ZIP 기반
+    mimeType: mimeType // CBZ도 ZIP 기반
   };
 
   const params = {

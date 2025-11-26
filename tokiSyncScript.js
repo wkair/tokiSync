@@ -56,10 +56,13 @@
     }
 
     // ⚡️ 성능 및 안전 설정
-    const MAX_UPLOAD_CONCURRENCY = 2; // 동시 업로드 개수 (메모리 보호)
+    const MAX_UPLOAD_CONCURRENCY_NOVELS = 4; // 동시 업로드 개수 (메모리 보호)
+    const MAX_UPLOAD_CONCURRENCY_COMICS = 2; // 동시 업로드 개수 (메모리 보호)
     const CHUNK_SIZE = 20 * 1024 * 1024; // 업로드 조각 크기 (20MB)
     const WAIT_PER_EPISODE_MS = 3000; // 화별 대기
     const WAIT_PER_IMAGE_MS = 200; // 이미지별 대기 (안전값)
+
+    const ITEM_QUERY_SELECTOR_TAG = 'a.item-subject';
     // ===================================================================
 
     let site = '뉴토끼';
@@ -86,6 +89,8 @@
     } else {
         return;
     }
+
+    const MAX_UPLOAD_CONCURRENCY = site === '북토끼' ? MAX_UPLOAD_CONCURRENCY_NOVELS : MAX_UPLOAD_CONCURRENCY_COMICS;
 
     // --- [유틸리티] ---
     function getSeriesInfo() {
@@ -127,7 +132,7 @@
         if (!li.classList.contains('toki-downloaded')) {
             li.style.backgroundColor = bgColor;
         }
-        const link = li.querySelector('a');
+        const link = li.querySelector(ITEM_QUERY_SELECTOR_TAG);
         if (!link) return;
         let statusSpan = link.querySelector('.toki-status-msg');
         if (!statusSpan) {
@@ -183,9 +188,7 @@
                             const json = JSON.parse(res.responseText);
                             const history = JSON.parse(json.body || '[]');
                             const historyKey = `history_${info.id}`;
-                            const merged = Array.from(new Set([...GM_getValue(historyKey, []), ...history])).sort(
-                                (a, b) => a - b
-                            );
+                            const merged = Array.from(new Set([...history])).sort((a, b) => a - b);
                             GM_setValue(historyKey, merged);
                             markDownloadedItems();
                             resolve(merged);
@@ -211,7 +214,12 @@
             GM_xmlhttpRequest({
                 method: 'POST',
                 url: config.url,
-                data: JSON.stringify({ key: config.key, type: 'init', folderName: folderName, fileName: fileName }),
+                data: JSON.stringify({
+                    key: config.key,
+                    type: 'init',
+                    folderName: folderName,
+                    fileName: fileName
+                }),
                 headers: { 'Content-Type': 'text/plain' },
                 onload: res => {
                     try {
@@ -352,7 +360,7 @@
                     li.style.opacity = '0.6';
                     const statusSpan = li.querySelector('.toki-status-msg');
                     if (statusSpan) statusSpan.remove();
-                    const link = li.querySelector('a');
+                    const link = li.querySelector(ITEM_QUERY_SELECTOR_TAG);
                     if (link && !link.querySelector('.toki-mark')) {
                         const checkMark = document.createElement('span');
                         checkMark.innerText = ' ✅ 다운완료';
@@ -438,13 +446,12 @@
 
             for (let i = 0; i < list.length; i++) {
                 const currentLi = list[i];
-                const zip = new JSZip();
-                const src = currentLi.querySelector('a').href;
+                const src = currentLi.querySelector(ITEM_QUERY_SELECTOR_TAG).href;
                 const numText = currentLi.querySelector('.wr-num').innerText.trim();
                 const num = parseInt(numText);
 
                 const epFullTitle = currentLi
-                    .querySelector('a')
+                    .querySelector(ITEM_QUERY_SELECTOR_TAG)
                     .innerHTML.replace(/<span[\s\S]*?\/span>/g, '')
                     .trim();
                 const epCleanTitle = epFullTitle
@@ -452,7 +459,10 @@
                     .trim()
                     .replace(/[:\?\/]/g, '');
                 const paddedNum = numText.padStart(4, '0');
-                const zipFileName = `${paddedNum} - ${epCleanTitle}.cbz`;
+
+                const fileName = `${paddedNum} - ${epCleanTitle}`;
+                let fileExt = '.zip';
+                let content = null;
 
                 setListItemStatus(currentLi, '⏳ 로딩 중...', '#fff9c4', '#d32f2f');
                 updateStatus(
@@ -481,8 +491,10 @@
 
                 if (site == '북토끼') {
                     const fileContent = iframeDocument.querySelector('#novel_content').innerText;
-                    zip.file(`${num} ${epCleanTitle}.txt`, fileContent);
+                    fileExt = '.txt';
+                    content = new Blob([fileContent], { type: 'text/plain' });
                 } else {
+                    const zip = new JSZip();
                     let imgLists = Array.from(iframeDocument.querySelectorAll('.view-padding div img'));
                     for (let j = 0; j < imgLists.length; ) {
                         if (imgLists[j].checkVisibility() === false) imgLists.splice(j, 1);
@@ -565,14 +577,14 @@
                             await sleep(getDynamicWait(WAIT_PER_IMAGE_MS));
                         } catch (e) {}
                     }
+                    setListItemStatus(currentLi, '📦 압축 중...', '#ffe0b2', '#e65100');
+                    fileExt = '.cbz';
+                    content = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: 5 }
+                    });
                 }
-
-                setListItemStatus(currentLi, '📦 압축 중...', '#ffe0b2', '#e65100');
-                const content = await zip.generateAsync({
-                    type: 'blob',
-                    compression: 'DEFLATE',
-                    compressionOptions: { level: 5 }
-                });
 
                 if (activeUploads.size >= MAX_UPLOAD_CONCURRENCY) {
                     updateStatus(`<strong>업로드 대기 중...</strong>`);
@@ -581,7 +593,8 @@
 
                 setListItemStatus(currentLi, '☁️ 업로드 중...', '#bbdefb', '#0d47a1');
 
-                const uploadTask = uploadResumable(content, targetFolderName, zipFileName)
+                const fullFileName = fileName + fileExt;
+                const uploadTask = uploadResumable(content, targetFolderName, fullFileName)
                     .then(() => {
                         saveHistoryToCloud(parseInt(num));
                     })
@@ -669,7 +682,7 @@
     }
 
     window.addEventListener('load', () => {
-        markDownloadedItems();
+        // markDownloadedItems();
         fetchHistoryFromCloud();
     });
     GM_registerMenuCommand('⚙️ 설정', openSettings);
