@@ -56,7 +56,7 @@
     }
 
     // ⚡️ 성능 및 안전 설정
-    const MAX_UPLOAD_CONCURRENCY_NOVELS = 4; // 동시 업로드 개수 (메모리 보호)
+    const MAX_UPLOAD_CONCURRENCY_NOVELS = 8; // 동시 업로드 개수 (메모리 보호)
     const MAX_UPLOAD_CONCURRENCY_COMICS = 2; // 동시 업로드 개수 (메모리 보호)
     const CHUNK_SIZE = 20 * 1024 * 1024; // 업로드 조각 크기 (20MB)
     const WAIT_PER_EPISODE_MS = 3000; // 화별 대기
@@ -64,6 +64,31 @@
 
     const ITEM_QUERY_SELECTOR_TAG = 'a.item-subject';
     // ===================================================================
+
+    let isDownloadCancelled = false; // 다운로드 중지 플래그
+
+    function resetDownloadCancellation() {
+        isDownloadCancelled = false;
+        const stopBtn = document.getElementById('tokiStopBtn');
+        if (stopBtn) {
+            stopBtn.disabled = false;
+            stopBtn.style.background = '#f44336';
+            stopBtn.style.cursor = 'pointer';
+            stopBtn.innerText = '⏹️ 다운로드 중지';
+        }
+    }
+
+    function cancelDownload() {
+        isDownloadCancelled = true;
+        const stopBtn = document.getElementById('tokiStopBtn');
+        if (stopBtn) {
+            stopBtn.disabled = true;
+            stopBtn.style.background = '#888';
+            stopBtn.style.cursor = 'not-allowed';
+            stopBtn.innerText = '⏹️ 중지됨';
+        }
+        updateStatus('<strong>⏹️ 중지 요청됨</strong><br>현재 진행 중인 업로드 완료 후 중지됩니다.');
+    }
 
     let site = '뉴토끼';
     let protocolDomain = 'https://newtoki469.com';
@@ -155,9 +180,10 @@
         statusUI.style.cssText =
             'position:fixed; bottom:20px; right:20px; background:rgba(0,0,0,0.8); color:white; padding:15px; border-radius:10px; z-index:99999; font-family:sans-serif; font-size:14px; max-width:300px;';
         statusUI.innerHTML =
-            '<button id="tokiCloseBtn" style="position:absolute; top:5px; right:5px; background:none; border:none; color:white; font-weight:bold; cursor:pointer;">X</button><p id="tokiStatusText" style="margin:0 0 10px 0;">준비 중...</p><button id="tokiResumeButton" style="display:none; width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer;">캡차 해결 완료</button>';
+            '<button id="tokiCloseBtn" style="position:absolute; top:5px; right:5px; background:none; border:none; color:white; font-weight:bold; cursor:pointer;">X</button><p id="tokiStatusText" style="margin:0 0 10px 0;">준비 중...</p><button id="tokiStopBtn" style="width:100%; padding:8px; background:#f44336; color:white; border:none; border-radius:5px; cursor:pointer; margin-bottom:5px;">⏹️ 다운로드 중지</button><button id="tokiResumeButton" style="display:none; width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer;">캡차 해결 완료</button>';
         document.body.appendChild(statusUI);
         document.getElementById('tokiCloseBtn').onclick = () => statusUI.remove();
+        document.getElementById('tokiStopBtn').onclick = () => cancelDownload();
     }
     function updateStatus(msg) {
         const el = document.getElementById('tokiStatusText');
@@ -445,6 +471,12 @@
             const activeUploads = new Set();
 
             for (let i = 0; i < list.length; i++) {
+                // 중지 플래그 체크 - 현재 업로드는 계속 진행
+                if (isDownloadCancelled) {
+                    updateStatus(`<strong>⏹️ 중지됨</strong><br>남은 업로드 ${activeUploads.size}개 완료 대기 중...`);
+                    break;
+                }
+
                 const currentLi = list[i];
                 const src = currentLi.querySelector(ITEM_QUERY_SELECTOR_TAG).href;
                 const numText = currentLi.querySelector('.wr-num').innerText.trim();
@@ -615,6 +647,11 @@
                 updateStatus(`<strong>마무리 중... (${activeUploads.size}개)</strong>`);
                 await Promise.all(activeUploads);
             }
+
+            if (isDownloadCancelled) {
+                updateStatus('<strong>⏹️ 다운로드가 중지되었습니다.</strong>');
+            }
+
             iframe.remove();
         } catch (error) {
             let errorMsg = error.message || error.toString();
@@ -631,6 +668,7 @@
     // ... (메뉴 및 실행 코드는 동일) ...
     async function autoSyncDownloadManager() {
         if (!checkConfig()) return;
+        resetDownloadCancellation(); // 시작 시 중지 플래그 리셋
         startSilentAudio();
         initStatusUI();
         const history = await fetchHistoryFromCloud();
@@ -661,6 +699,7 @@
 
     async function batchDownloadManager() {
         if (!checkConfig()) return;
+        resetDownloadCancellation(); // 시작 시 중지 플래그 리셋
         startSilentAudio();
         initStatusUI();
         const s = prompt('시작?');
@@ -690,6 +729,7 @@
     GM_registerMenuCommand('🔢 범위 다운로드 (시작~끝)', batchDownloadManager);
     GM_registerMenuCommand('1회성 다운로드 (N~N)', () => {
         if (!checkConfig()) return;
+        resetDownloadCancellation(); // 시작 시 중지 플래그 리셋
         startSilentAudio();
         initStatusUI();
         const s = prompt('시작?', 1);
@@ -701,4 +741,5 @@
             setTimeout(() => document.getElementById('tokiStatusDisplay')?.remove(), 5000);
         });
     });
+    GM_registerMenuCommand('⏹️ 다운로드 중지', cancelDownload);
 })();
