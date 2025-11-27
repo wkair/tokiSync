@@ -56,7 +56,7 @@
     }
 
     // ⚡️ 성능 및 안전 설정
-    const MAX_UPLOAD_CONCURRENCY_NOVELS = 8; // 동시 업로드 개수 (메모리 보호)
+    const MAX_UPLOAD_CONCURRENCY_NOVELS = 2; // 동시 업로드 개수 (메모리 보호)
     const MAX_UPLOAD_CONCURRENCY_COMICS = 2; // 동시 업로드 개수 (메모리 보호)
     const CHUNK_SIZE = 20 * 1024 * 1024; // 업로드 조각 크기 (20MB)
     const WAIT_PER_EPISODE_MS = 3000; // 화별 대기
